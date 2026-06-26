@@ -71,9 +71,6 @@ if type(C) ~= "table" then return end
 
 local floor = math.floor
 
--- ============================================================
--- RECONNECT BYPASS (integrado) - SEM FFI.CDEF DUPLICADO
--- ============================================================
 local DEBUG_STATUS = false   -- true para ver janela do PowerShell
 
 local SW_HIDE = 0x0
@@ -1512,27 +1509,24 @@ VR._on   = function() return vrOn:Get() end
 VR._mode = function() return vrMode:Get() end
 
 -- ============================================================
--- RECONNECT BYPASS (integrado na aba MISC) - CORRIGIDO
+-- RECONNECT BYPASS (compacto)
 -- ============================================================
 ntab:Row()
 local rbSec = ntab:Section("Reconnect Bypass")
 
+-- Botões Enable e Disable
 rbSec:Button("Enable", BlockSteamOutConnection)
 rbSec:Button("Disable", UnlockSteamOutConnection)
 
--- Variável para armazenar o texto do status (será atualizado dinamicamente)
+-- Variável para armazenar o status
 local rbStatusValue = "Status: Desconhecido"
 
--- Widget custom para exibir o status e informações
-rbSec:Custom(80, function(UI, x, y, w)
-    -- Desenha o status (usando a variável rbStatusValue)
-    UI.text(x, y, rbStatusValue, nil)
-    -- Textos informativos
-    UI.text(x, y + 20, "Cria regra no firewall para evitar reconexão automática.", nil)
-    UI.text(x, y + 40, "Ative antes de ser expulso ou ao sair da partida.", nil)
+-- Widget custom para exibir o status (apenas 1 linha)
+rbSec:Custom(22, function(UI, x, y, w)
+    UI.text(x, y, rbStatusValue)
 end)
 
--- Cria uma referência para atualizar o status de fora (compatível com as funções Block/Unlock)
+-- Atualiza a referência para as funções Block/Unlock usarem
 rbStatusTextRef = {
     SetText = function(self, text)
         rbStatusValue = text
