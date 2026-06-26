@@ -17,7 +17,7 @@ local SIG = {
 }
 
 -- ============================================================
--- FFI UNIFICADO (VNWHITE + RECONNECT BYPASS)
+-- FFI UNIFICADO (sem comentários Lua dentro do cdef)
 -- ============================================================
 ffi.cdef[[
     void* VirtualAlloc(void*, size_t, uint32_t, uint32_t);
