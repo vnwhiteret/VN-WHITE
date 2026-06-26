@@ -1776,22 +1776,20 @@ M:OnFrame(function()
 end)
 
 -- ============================================================
--- CALLBACK DE UNLOAD (UNIFICADO)
+-- CALLBACK DE UNLOAD (COM VERIFICAÇÃO DE SEGURANÇA)
 -- ============================================================
 callbacks.Register("Unload", function()
     pcall(VM.uninstall)
     pcall(RG.uninstall)
-    if rbUnload then
+    -- Verifica se a função rbUnload existe antes de chamá-la
+    if type(rbUnload) == "function" then
         pcall(rbUnload)
-    else
-        print("[RB] rbUnload não definida, ignorando.")
     end
 end)
 
 -- ============================================================
 -- CONSTRÓI A INTERFACE
 -- ============================================================
-
 M:Build({ w = 720, h = 500 })
 
 print("[vnwhite] Script VNWHITE completamente carregado!")
