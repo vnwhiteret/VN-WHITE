@@ -33,12 +33,12 @@ end
 
 local function load(url, cacheFile, name)
     local src, where = fetch(url, cacheFile)
-    if not src then print("[femboytap] FATAL: cannot load " .. name) return nil end
+    if not src then print("[vnwhite] FATAL: cannot load " .. name) return nil end
     local chunk, err = loadstring(src, "=" .. cacheFile)
-    if not chunk then print("[femboytap] " .. name .. " compile error: " .. tostring(err)) return nil end
+    if not chunk then print("[vnwhite] " .. name .. " compile error: " .. tostring(err)) return nil end
     local ok, mod = pcall(chunk)
-    if not ok then print("[femboytap] " .. name .. " run error: " .. tostring(mod)) return nil end
-    print("[femboytap] " .. name .. " loaded from " .. tostring(where))
+    if not ok then print("[vnwhite] " .. name .. " run error: " .. tostring(mod)) return nil end
+    print("[vnwhite] " .. name .. " loaded from " .. tostring(where))
     return mod
 end
 
@@ -169,7 +169,7 @@ do
     end
 
     local function install()
-        if type(ffi) ~= "table" then print("[femboytap] VM: no ffi"); return false end
+        if type(ffi) ~= "table" then print("[vnwhite] VM: no ffi"); return false end
         pcall(function() ffi.cdef [[
             void* VirtualAlloc(void*, size_t, uint32_t, uint32_t);
             int   VirtualProtect(void*, size_t, uint32_t, uint32_t*);
@@ -178,12 +178,12 @@ do
         ]] end)
 
         local a = mem.FindPattern("client.dll", SIG.vm)
-        if not a or a == 0 then print("[femboytap] VM: sig not found"); return false end
+        if not a or a == 0 then print("[vnwhite] VM: sig not found"); return false end
         match = a
         local orig = a + 5 + r_i32(a + 1)
 
         local p = alloc_near(orig, 0x1000)
-        if p == nil then print("[femboytap] VM: alloc failed"); return false end
+        if p == nil then print("[vnwhite] VM: alloc failed"); return false end
         page = tonumber(ffi.cast("uintptr_t", p))
         local code = page + 16
 
@@ -202,14 +202,14 @@ do
         w_i32(page, 0); w_f32(page + 4, 0); w_f32(page + 8, 0); w_f32(page + 12, 0)
 
         local rel = code - (match + 5)
-        if rel < -2147483648 or rel > 2147483647 then print("[femboytap] VM: rel32 overflow"); return false end
+        if rel < -2147483648 or rel > 2147483647 then print("[vnwhite] VM: rel32 overflow"); return false end
         origRel = r_i32(match + 1)
         local old = ffi.new("uint32_t[1]")
         ffi.C.VirtualProtect(ffi.cast("void*", match), 5, 0x40, old)
         w_i32(match + 1, rel)
         ffi.C.VirtualProtect(ffi.cast("void*", match), 5, old[0], old)
         pcall(function() ffi.C.FlushInstructionCache(ffi.C.GetCurrentProcess(), ffi.cast("void*", match), 5) end)
-        print("[femboytap] VM: installed")
+        print("[vnwhite] VM: installed")
         return true
     end
 
@@ -683,8 +683,8 @@ do
         pcall(function() okI = install() end)
         if utils ~= nil and vtbl ~= nil then pcall(enumerate) end
         RG.ok = okI
-        if okI then print("[femboytap] region: hooked " .. #hooks .. " fns (" .. #RG.ids .. " pops)")
-        else            print("[femboytap] region: hook failed") end
+        if okI then print("[vnwhite] region: hooked " .. #hooks .. " fns (" .. #RG.ids .. " pops)")
+        else            print("[vnwhite] region: hook failed") end
     end
 
     if #RG.names == 0 then RG.names = { "[ join a server, then Refresh ]" } end
@@ -748,12 +748,12 @@ do
     end
 
     local function install()
-        if type(f) ~= "table" then print("[femboytap] namechanger: no ffi"); return false end
+        if type(f) ~= "table" then print("[vnwhite] namechanger: no ffi"); return false end
         local a = mem.FindPattern(DLL, SIG_SETINFO)
-        if not a or a == 0 then print("[femboytap] namechanger: sig not found"); return false end
+        if not a or a == 0 then print("[vnwhite] namechanger: sig not found"); return false end
         T = a
         local b0 = f.cast("uint8_t*", T)
-        local p = alloc_near(T); if p == nil then print("[femboytap] namechanger: alloc failed"); return false end
+        local p = alloc_near(T); if p == nil then print("[vnwhite] namechanger: alloc failed"); return false end
         local TR = tonumber(f.cast("uintptr_t", p))
 
         local saved = {}
@@ -766,7 +766,7 @@ do
 
         local old = f.new("uint32_t[1]")
         if f.C.VirtualProtect(f.cast("void*", T), STEAL, 0x40, old) == 0 then
-            print("[femboytap] namechanger: protect failed"); return false
+            print("[vnwhite] namechanger: protect failed"); return false
         end
         w_u8(T, 0xFF); w_u8(T + 1, 0x25); w_i32(T + 2, 0)
         le64(T + 6, tonumber(f.cast("uintptr_t", keepCb)))
@@ -837,7 +837,7 @@ do
     function NC.dump()
         local d = NC._diag or {}
         local function hx(v) return v and string.format("%X", v) or "nil" end
-        print("[femboytap] NC: base=" .. hx(d.base) .. " cvar=" .. hx(d.cvar) ..
+        print("[vnwhite] NC: base=" .. hx(d.base) .. " cvar=" .. hx(d.cvar) ..
               " vt=" .. hx(d.vt) .. " find=" .. hx(d.find) .. " ref=" .. hx(d.ref) ..
               " handle=" .. tostring(d.handle) .. " obj=" .. hx(d.obj) ..
               " flags " .. hx(d.old) .. "->" .. hx(d.new))
@@ -878,8 +878,8 @@ do
     local okI = false
     pcall(function() okI = install() end)
     NC.ok = okI
-    if okI then print("[femboytap] namechanger: hooked SetInfo @ " .. string.format("%X", T))
-    else        print("[femboytap] namechanger: install failed") end
+    if okI then print("[vnwhite] namechanger: hooked SetInfo @ " .. string.format("%X", T))
+    else        print("[vnwhite] namechanger: install failed") end
 end
 pcall(function() callbacks.Register("Unload", function() pcall(NC.uninstall) end) end)
 
@@ -894,9 +894,9 @@ do
             fn    = f.cast("void(*)(void*, void*, uint32_t, const char*, const char*)", f.cast("void*", a))
             flags = f.new("int[1]", 0x0100)
             CHAT.ok = true
-            print("[femboytap] chat: hooked print @ " .. string.format("%X", a))
+            print("[vnwhite] chat: hooked print @ " .. string.format("%X", a))
         else
-            print("[femboytap] chat: print sig not found")
+            print("[vnwhite] chat: print sig not found")
         end
     end
     function CHAT.print(text)
