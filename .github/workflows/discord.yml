@@ -8,9 +8,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Send message to Discord
+      - name: Send rich Discord message
         run: |
           curl -H "Content-Type: application/json" \
           -X POST \
-          -d "{\"content\":\"🚀 Novo push no repo!\"}" \
+          -d "{
+            \"embeds\": [
+              {
+                \"title\": \"🚀 Novo Update no Repositório\",
+                \"description\": \"Um novo commit foi enviado com sucesso.\",
+                \"color\": 5814783,
+                \"fields\": [
+                  {
+                    \"name\": \"📦 Repositório\",
+                    \"value\": \"${{ github.repository }}\",
+                    \"inline\": true
+                  },
+                  {
+                    \"name\": \"🌿 Branch\",
+                    \"value\": \"${{ github.ref_name }}\",
+                    \"inline\": true
+                  },
+                  {
+                    \"name\": \"📝 Commit\",
+                    \"value\": \"${{ github.event.head_commit.message }}\"
+                  },
+                  {
+                    \"name\": \"👤 Autor\",
+                    \"value\": \"${{ github.actor }}\"
+                  }
+                ],
+                \"footer\": {
+                  \"text\": \"GitHub Auto Deploy\"
+                }
+              }
+            ]
+          }" \
           ${{ secrets.DISCORD_WEBHOOK }}
