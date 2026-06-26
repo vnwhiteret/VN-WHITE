@@ -1,8 +1,4 @@
--- ============================================================
--- VNWHITE - MAIN (COMPLETO)
--- ============================================================
-
-local BASE = rawget(_G, "VNWHITE_BASE") or "https://raw.githubusercontent.com/vnwhiteret/VN-WHITE/main/"
+local BASE        = rawget(_G, "VNWHITE_BASE") or "https://raw.githubusercontent.com/vnwhiteret/VN-WHITE/main/"
 local GUILIB_URL  = BASE .. "vnwhite_guilib.lua"
 local CHANGER_URL = BASE .. "vnwhite_changer.lua"
 
@@ -984,15 +980,11 @@ pcall(function()
     for _, e in ipairs({ "player_hurt", "weapon_fire", "vote_started", "vote_begin", "vote_cast" }) do
         pcall(function() client.AllowListener(e) end)
     end
-    callbacks.Register("FireGameEvent", "VNWhite_Events", function(ev)
+    callbacks.Register("FireGameEvent", "VNWHITE_Events", function(ev)
         pcall(HS.onEvent, ev)
         pcall(VR.onEvent, ev)
     end)
 end)
-
--- ============================================================
--- GUI - SKINS TAB
--- ============================================================
 
 local tab = M:Tab("Skins")
 
@@ -1016,10 +1008,6 @@ actSec:Button("Reset All", function() C.resetAll() end)
 
 local cfgSec = tab:Section("Config")
 cfgSec:Button("Reset config", function() C.clearConfig() end)
-
--- ============================================================
--- GUI - VISUALS TAB
--- ============================================================
 
 local vtab = M:Tab("Visuals")
 
@@ -1117,10 +1105,6 @@ wmElems = wmSec:MultiCombo("Elements",
     { "Cheat name", "Lua name", "Username", "Nickname", "fps", "ping" }, { 2, 4, 5, 6 })
 wmPos   = wmSec:Combo("Position", { "Top left", "Top right", "Bottom left", "Bottom right" }, 2)
 
--- ============================================================
--- NAME CHANGER - FUNÇÕES E GERADORES
--- ============================================================
-
 local ncClock = (function()
     for _, fn in ipairs({ function() return globals.RealTime() end,
                           function() return globals.CurTime() end,
@@ -1164,21 +1148,27 @@ local function ncGlitch(target)
     return seq
 end
 
--- 1. Ping-Pong (escreve, pausa, apaga, pausa)
+-- ============================================================
+-- FUNÇÕES DE ANIMAÇÃO (PING-PONG, FRENTE, TRÁS, DOUBLE BOUNCE, REVERSE)
+-- ============================================================
+
 local function generatePingPong(text, pauseMs, charMs)
     local frames = {}
+    -- Escreve frente
     for i = 1, #text do
         frames[#frames + 1] = { t = text:sub(1, i), ms = charMs }
     end
+    -- Pausa no final
     frames[#frames + 1] = { t = text, ms = pauseMs }
+    -- Apaga de trás para frente
     for i = #text - 1, 1, -1 do
         frames[#frames + 1] = { t = text:sub(1, i), ms = charMs }
     end
+    -- Pausa no vazio
     frames[#frames + 1] = { t = "", ms = pauseMs / 2 }
     return frames
 end
 
--- 2. Só frente
 local function generateForwardOnly(text, pauseMs, charMs)
     local frames = {}
     for i = 1, #text do
@@ -1188,7 +1178,6 @@ local function generateForwardOnly(text, pauseMs, charMs)
     return frames
 end
 
--- 3. Só trás (começa escrito e apaga)
 local function generateBackwardOnly(text, pauseMs, charMs)
     local frames = {}
     frames[#frames + 1] = { t = text, ms = pauseMs / 2 }
@@ -1199,21 +1188,23 @@ local function generateBackwardOnly(text, pauseMs, charMs)
     return frames
 end
 
--- 4. Double Bounce (frente-trás-frente-trás)
 local function generateDoubleBounce(text, pauseMs, charMs)
     local frames = {}
+    -- Frente
     for i = 1, #text do frames[#frames + 1] = { t = text:sub(1, i), ms = charMs } end
     frames[#frames + 1] = { t = text, ms = pauseMs / 2 }
+    -- Trás
     for i = #text - 1, 1, -1 do frames[#frames + 1] = { t = text:sub(1, i), ms = charMs } end
     frames[#frames + 1] = { t = "", ms = pauseMs / 2 }
+    -- Frente de novo
     for i = 1, #text do frames[#frames + 1] = { t = text:sub(1, i), ms = charMs } end
     frames[#frames + 1] = { t = text, ms = pauseMs }
+    -- Trás de novo
     for i = #text - 1, 1, -1 do frames[#frames + 1] = { t = text:sub(1, i), ms = charMs } end
     frames[#frames + 1] = { t = "", ms = pauseMs / 2 }
     return frames
 end
 
--- 5. Escreve ao contrário (de trás para frente)
 local function generateReverse(text, pauseMs, charMs)
     local frames = {}
     local rev = text:reverse()
@@ -1224,8 +1215,12 @@ local function generateReverse(text, pauseMs, charMs)
     return frames
 end
 
-local NC_VNWHITE  = generatePingPong("VNWHITE", 2000, 60)
-local NC_DISCORD  = generateDoubleBounce("discord.com/vnwhite NFA R$4.10", 2500, 50)
+-- ============================================================
+-- GERANDO AS SEQUÊNCIAS PARA O NAME CHANGER
+-- ============================================================
+
+local NC_VNWHITE = generatePingPong("VNWHITE", 2000, 60)
+local NC_DISCORD = generateDoubleBounce("discord.com/vnwhite NFA R$4.10", 2500, 50)
 
 local NC_VNWHITE_G = ncGlitch("VNWHITE")
 local NC_DISCORD_G = ncGlitch("discord.com/vnwhite NFA R$4.10")
@@ -1261,19 +1256,19 @@ local function ncValue(t)
     local src = ncSrc and ncSrc:Get() or 1
     local glitch = ncStyle and ncStyle:Get() == 2
     local s
-    if src == 2 then  -- VNWHITE
+    if src == 2 then
         s = ncFrameAt(glitch and NC_VNWHITE_G or NC_VNWHITE, t, (ncSpeed:Get() or 400) / 400)
-    elseif src == 3 then  -- Discord
+    elseif src == 3 then
         s = ncFrameAt(glitch and NC_DISCORD_G or NC_DISCORD, t, (ncSpeed:Get() or 400) / 400)
-    elseif src == 4 then  -- Custom
+    elseif src == 4 then
         s = ncFrameAt(ncParse(ncText:Get(), floor(ncSpeed:Get() or 400)), t, 1)
-    else  -- Static
+    else
         s = ncText:Get()
     end
     s = s or ""
     if ncMode and ncMode:Get() == 2 then
         local rn = NC.origName()
-        if rn and rn ~= "" then s = (s == "") and rn or (s .. " " .. rn)
+        if rn and rn ~= "" then s = (s == "") and rn or (s .. " " .. rn) end
     end
     return s
 end
@@ -1288,10 +1283,6 @@ local function ncApply(val, raw)
         pcall(function() client.Command('setinfo name "' .. val:gsub('"', '') .. '"', true) end)
     end
 end
-
--- ============================================================
--- GUI - MISC TAB
--- ============================================================
 
 local ntab = M:Tab("Misc")
 ntab:Row()
@@ -1332,9 +1323,6 @@ vrSec:Button("Test", function() VR.test() end)
 VR._on   = function() return vrOn:Get() end
 VR._mode = function() return vrMode:Get() end
 
--- ============================================================
--- SYNC FUNCTIONS
--- ============================================================
 
 local lastWm
 local function wmSync()
@@ -1477,10 +1465,6 @@ local function vrSync()
     end
 end
 
--- ============================================================
--- CARREGAMENTO DE CONFIGURAÇÕES
--- ============================================================
-
 if C.loadConfig() then lastSel = -2 end
 cbAuto:Set(C.getOpt("autoFollow") and true or false)
 lastAuto = cbAuto:Get()
@@ -1563,10 +1547,6 @@ do local s = C.getOpt("nc_text"); if type(s) == "string" then ncText:Set(s) end 
 vrOn:Set(getBool("vr_on", false))
 do local p = tonumber(C.getOpt("vr_mode")); if p and p >= 1 and p <= 3 then vrMode:Set(p) end end
 
--- ============================================================
--- ONFRAME - EXECUTA TODAS AS SYNCS
--- ============================================================
-
 M:OnFrame(function()
     pcall(autoFollow)
     pcall(syncSkins)
@@ -1582,9 +1562,5 @@ M:OnFrame(function()
     pcall(ncSync)
     pcall(vrSync)
 end)
-
--- ============================================================
--- CONSTRÓI A INTERFACE
--- ============================================================
 
 M:Build({ w = 720, h = 500 })
