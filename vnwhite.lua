@@ -1781,7 +1781,7 @@ end)
 callbacks.Register("Unload", function()
     pcall(VM.uninstall)
     pcall(RG.uninstall)
-    pcall(rbUnload)
+    if rbUnload then pcall(rbUnload) end
 end)
 
 -- ============================================================
