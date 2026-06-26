@@ -20,13 +20,10 @@ local SIG = {
 -- FFI UNIFICADO (VNWHITE + RECONNECT BYPASS)
 -- ============================================================
 ffi.cdef[[
-    -- VNWHITE
     void* VirtualAlloc(void*, size_t, uint32_t, uint32_t);
     int   VirtualProtect(void*, size_t, uint32_t, uint32_t*);
     void* GetCurrentProcess(void);
     int   FlushInstructionCache(void*, void*, size_t);
-
-    -- Reconnect Bypass
     int RegOpenKeyExA(void* hKey, const char* lpSubKey, unsigned long ulOptions, unsigned long samDesired, void** phkResult);
     int RegQueryValueExA(void* hKey, const char* lpValueName, unsigned long* lpReserved, unsigned long* lpType, unsigned char* lpData, unsigned long* lpcbData);
     int RegCloseKey(void* hKey);
