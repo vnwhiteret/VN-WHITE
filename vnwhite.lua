@@ -1509,7 +1509,7 @@ VR._on   = function() return vrOn:Get() end
 VR._mode = function() return vrMode:Get() end
 
 -- ============================================================
--- RECONNECT BYPASS (compacto)
+-- RECONNECT BYPASS (compacto com depuração)
 -- ============================================================
 ntab:Row()
 local rbSec = ntab:Section("Reconnect Bypass")
@@ -1518,7 +1518,7 @@ local rbSec = ntab:Section("Reconnect Bypass")
 rbSec:Button("Enable", BlockSteamOutConnection)
 rbSec:Button("Disable", UnlockSteamOutConnection)
 
--- Variável para armazenar o status
+-- Variável para armazenar o status (deve ser acessível pelo widget custom)
 local rbStatusValue = "Status: Desconhecido"
 
 -- Widget custom para exibir o status (apenas 1 linha)
@@ -1526,10 +1526,11 @@ rbSec:Custom(22, function(UI, x, y, w)
     UI.text(x, y, rbStatusValue)
 end)
 
--- Atualiza a referência para as funções Block/Unlock usarem
+-- Referência para as funções Block/Unlock atualizarem o status
 rbStatusTextRef = {
     SetText = function(self, text)
         rbStatusValue = text
+        print("[RB] Status atualizado para: " .. text)  -- <-- depuração
     end
 }
 
