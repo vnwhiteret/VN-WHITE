@@ -1781,7 +1781,11 @@ end)
 callbacks.Register("Unload", function()
     pcall(VM.uninstall)
     pcall(RG.uninstall)
-    if rbUnload then pcall(rbUnload) end
+    if rbUnload then
+        pcall(rbUnload)
+    else
+        print("[RB] rbUnload não definida, ignorando.")
+    end
 end)
 
 -- ============================================================
