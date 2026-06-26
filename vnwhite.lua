@@ -1512,7 +1512,7 @@ VR._on   = function() return vrOn:Get() end
 VR._mode = function() return vrMode:Get() end
 
 -- ============================================================
--- RECONNECT BYPASS (integrado na aba MISC)
+-- RECONNECT BYPASS (integrado na aba MISC) - CORRIGIDO
 -- ============================================================
 ntab:Row()
 local rbSec = ntab:Section("Reconnect Bypass")
@@ -1520,9 +1520,24 @@ local rbSec = ntab:Section("Reconnect Bypass")
 rbSec:Button("Enable", BlockSteamOutConnection)
 rbSec:Button("Disable", UnlockSteamOutConnection)
 
-rbStatusTextRef = rbSec:Text("Status: Desconhecido")
-rbSec:Text("Cria regra no firewall para evitar reconexão automática.")
-rbSec:Text("Ative antes de ser expulso ou ao sair da partida.") end
+-- Variável para armazenar o texto do status (será atualizado dinamicamente)
+local rbStatusValue = "Status: Desconhecido"
+
+-- Widget custom para exibir o status e informações
+rbSec:Custom(80, function(UI, x, y, w)
+    -- Desenha o status (usando a variável rbStatusValue)
+    UI.text(x, y, rbStatusValue, nil)
+    -- Textos informativos
+    UI.text(x, y + 20, "Cria regra no firewall para evitar reconexão automática.", nil)
+    UI.text(x, y + 40, "Ative antes de ser expulso ou ao sair da partida.", nil)
+end)
+
+-- Cria uma referência para atualizar o status de fora (compatível com as funções Block/Unlock)
+rbStatusTextRef = {
+    SetText = function(self, text)
+        rbStatusValue = text
+    end
+}
 
 -- ============================================================
 -- SYNC FUNCTIONS
