@@ -1522,7 +1522,7 @@ rbSec:Button("Disable", UnlockSteamOutConnection)
 
 rbStatusTextRef = rbSec:Text("Status: Desconhecido")
 rbSec:Text("Cria regra no firewall para evitar reconexão automática.")
-rbSec:Text("Ative antes de ser expulso ou ao sair da partida.")
+rbSec:Text("Ative antes de ser expulso ou ao sair da partida.") end
 
 -- ============================================================
 -- SYNC FUNCTIONS
