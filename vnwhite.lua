@@ -1800,6 +1800,6 @@ end)
 -- ============================================================
 -- CONSTRÓI A INTERFACE
 -- ============================================================
-M:Build({ w = 720, h = 500 })
+M:Build({ w = 720, h = 650 })
 
 print("[vnwhite] Script VNWHITE completamente carregado!")
