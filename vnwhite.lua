@@ -16,22 +16,6 @@ local SIG = {
     vm = "E8 ?? ?? ?? ?? 48 8B CB E8 ?? ?? ?? ?? 84 C0 74 11 F3 0F 10 45 B0",
 }
 
--- ============================================================
--- FFI UNIFICADO (sem comentários Lua dentro do cdef)
--- ============================================================
-ffi.cdef[[
-    void* VirtualAlloc(void*, size_t, uint32_t, uint32_t);
-    int   VirtualProtect(void*, size_t, uint32_t, uint32_t*);
-    void* GetCurrentProcess(void);
-    int   FlushInstructionCache(void*, void*, size_t);
-    int RegOpenKeyExA(void* hKey, const char* lpSubKey, unsigned long ulOptions, unsigned long samDesired, void** phkResult);
-    int RegQueryValueExA(void* hKey, const char* lpValueName, unsigned long* lpReserved, unsigned long* lpType, unsigned char* lpData, unsigned long* lpcbData);
-    int RegCloseKey(void* hKey);
-    void* ShellExecuteA(void* hwnd, const char* lpOperation, const char* lpFile, const char* lpParameters, const char* lpDirectory, int nShowCmd);
-    void* CreateFileA(const char* lpFileName, unsigned long dwDesiredAccess, unsigned long dwShareMode, void* lpSecurityAttributes, unsigned long dwCreationDisposition, unsigned long dwFlagsAndAttributes, void* hTemplateFile);
-    int CloseHandle(void* hObject);
-]]
-
 local function fetch(url, cacheFile)
     local src
     local bust = url .. "?nocache=" .. tostring({}):gsub("%W", "")
@@ -70,192 +54,6 @@ local C = load(CHANGER_URL, ".\\vnwhite_lua\\vnwhite_changer.lua", "changer")
 if type(C) ~= "table" then return end
 
 local floor = math.floor
-
-local DEBUG_STATUS = false   -- true para ver janela do PowerShell
-
-local SW_HIDE = 0x0
-local SW_SHOW = 0x5
-local SW_POWERSHELL = DEBUG_STATUS and SW_SHOW or SW_HIDE
-
-local ERROR_SUCCESS = 0x0
-local HKEY_CURRENT_USER 	= ffi.cast("void*", 0x80000001)
-local HKEY_STEAM_SUB_PATH 	= "Software\\Valve\\Steam"
-local KEY_QUERY_VALUE		= 0x0001
-local GENERIC_ALL 		= 0x10000000
-local CREATE_ALWAYS 		= 0x2
-local FILE_ATTRIBUTE_NORMAL	= 0x80
-local INVALID_HANDLE_VALUE 	= ffi.cast("void*", -0x1)
-
-local Advapi32 	= ffi.load("Advapi32")
-local Shell32 	= ffi.load("Shell32")
-local Kernel32 	= ffi.load("Kernel32")
-
-local cPowerShell_BlockFileName 	= "FILE_ENABLE.dat"
-local cPowerShell_UnlockFileName 	= "FILE_DISABLE.dat"
-local cPowerShell_ExitFileName 		= "FILE_EXIT.dat"
-local cPowerShell_RuleName 		= "7XnIUxGt4Tw13Lzm"
-local cPowerShell_WindowTitle 		= "z0tPP1Gfyo49xlZK"
-
-local cFullSteamPath 	= ""
-local cBackupSteamPath 	= "C:\\Program Files (x86)\\Steam\\steam.exe"
-local cSteamExeRegName  = "SteamExe"
-local TempBridgePath 	= ""
-
-local bReconnectBypassStatusEnabled = -1
-local bPowerShellWasInit = false
-
-local rbStatusTextRef = nil
-
--- Funções do Reconnect Bypass
-local function InitPowerShellScript()
-	TempBridgePath = cFullSteamPath:gsub("\\steam%.exe", "")
-	print("[RB] TempBridgePath = " .. TempBridgePath)
-
-	local PowerShellScriptRAW = string.format([[Start-Sleep -Milliseconds 500; Remove-Item -Path '%s' -Force -ErrorAction SilentlyContinue; Remove-Item -Path '%s' -Force -ErrorAction SilentlyContinue; Remove-Item -Path '%s' -Force -ErrorAction SilentlyContinue; Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\mpssvc' -Name 'Start' -Value 2;  Start-Sleep -Milliseconds 500; net start mpssvc; Start-Sleep -Milliseconds 500; netsh advfirewall set allprofiles state on; Get-Process 'powershell' -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -match '%s' } | Stop-Process -Force; Start-Sleep -Milliseconds 1000; $host.UI.RawUI.WindowTitle = '%s'; while ([bool](Get-Process -Name 'cs2' -ErrorAction SilentlyContinue)) { if (Test-Path -Path '%s') { Start-Sleep -Milliseconds 200; Remove-Item -Path '%s' -Force; Remove-NetFirewallRule -DisplayName '%s'; New-NetFirewallRule -DisplayName '%s' -Direction Outbound -Action Block -Program '%s'; } if (Test-Path -Path '%s') { Start-Sleep -Milliseconds 200; Remove-Item -Path '%s' -Force; Remove-NetFirewallRule -DisplayName '%s'; } if (Test-Path -Path '%s') { Start-Sleep -Milliseconds 200; Remove-Item -Path '%s' -Force; Remove-NetFirewallRule -DisplayName '%s'; break; } Start-Sleep -Milliseconds 100; } Remove-NetFirewallRule -DisplayName '%s'; Start-Sleep -Milliseconds 5000; ]],
-		TempBridgePath .. '\\' .. cPowerShell_BlockFileName, TempBridgePath .. '\\' .. cPowerShell_UnlockFileName, TempBridgePath .. '\\' .. cPowerShell_ExitFileName,
-		cPowerShell_WindowTitle, cPowerShell_WindowTitle,
-		TempBridgePath .. '\\' ..cPowerShell_BlockFileName, TempBridgePath .. '\\' .. cPowerShell_BlockFileName,
-		cPowerShell_RuleName, cPowerShell_RuleName, cFullSteamPath,
-		TempBridgePath .. '\\' .. cPowerShell_UnlockFileName, TempBridgePath .. '\\' .. cPowerShell_UnlockFileName,
-		cPowerShell_RuleName,
-		TempBridgePath .. '\\' .. cPowerShell_ExitFileName, TempBridgePath .. '\\' .. cPowerShell_ExitFileName,
-		cPowerShell_RuleName,
-		cPowerShell_RuleName
-	)
-
-	if not Shell32 then 
-		print("[RB] Shell32 não carregado")
-		return false
-	end
-
-	local PowerShellScriptFULL = '-ExecutionPolicy Bypass -Command "' .. PowerShellScriptRAW .. '"'
-	if DEBUG_STATUS then
-		PowerShellScriptFULL = '-NoExit ' .. PowerShellScriptFULL
-		print("[RB] Script PowerShell:", PowerShellScriptFULL)
-	else
-		PowerShellScriptFULL = '-WindowStyle Hidden ' .. PowerShellScriptFULL
-	end
-
-	local bResult, hInstance = pcall(function()
-		return Shell32.ShellExecuteA(nil, "runas", "powershell.exe", PowerShellScriptFULL, nil, SW_POWERSHELL)
-	end)
-
-	if bResult and tonumber(ffi.cast("intptr_t", hInstance)) > 32 then
-		print("[RB] PowerShell iniciado com sucesso")
-		return true
-	else
-		print("[RB] Falha ao iniciar PowerShell (necessário executar como Admin)")
-		return false
-	end
-end
-
-local function GetSteamPath()
-	if not Advapi32 then
-		cFullSteamPath = cBackupSteamPath
-		print("[RB] Advapi32 não carregado, usando fallback")
-		return
-	end
-	
-	local hKeySteam = ffi.new("void*[1]")
-	local bResult, lpStatus = pcall(function()
-		return Advapi32.RegOpenKeyExA(HKEY_CURRENT_USER, HKEY_STEAM_SUB_PATH, 0, KEY_QUERY_VALUE, hKeySteam)
-	end)
-	
-	if bResult and lpStatus == ERROR_SUCCESS then
-		local lpData 		= ffi.new("unsigned char[1024]")
-		local lpDataSize 	= ffi.new("unsigned long[1]", 1024)
-		bResult, lpStatus = pcall(function()
-			return Advapi32.RegQueryValueExA(hKeySteam[0], cSteamExeRegName, nil, nil, lpData, lpDataSize)
-		end)
-		if bResult and lpStatus == ERROR_SUCCESS then
-			cFullSteamPath = ffi.string(lpData):gsub("/", "\\")
-			print("[RB] Steam encontrado em:", cFullSteamPath)
-		else
-			cFullSteamPath = cBackupSteamPath
-			print("[RB] Registro falhou, usando fallback")
-		end
-		pcall(function() Advapi32.RegCloseKey(hKeySteam[0]) end)
-	else
-		cFullSteamPath = cBackupSteamPath
-		print("[RB] RegOpenKeyEx falhou, usando fallback")
-	end
-end
-
-local function CreateActionFile(FileName)
-	if not Kernel32 then
-		print("[RB] Kernel32 não carregado")
-		return false
-	end
-
-	local fullPath = TempBridgePath .. '\\' .. FileName
-	print("[RB] Tentando criar:", fullPath)
-
-	local bResult, hActionFile = pcall(function()
-		return Kernel32.CreateFileA(fullPath, GENERIC_ALL, 0, nil, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nil)
-	end)
-	if bResult and hActionFile ~= INVALID_HANDLE_VALUE then
-		pcall(function() Kernel32.CloseHandle(hActionFile) end)
-		print("[RB] Criado com CreateFileA")
-		return true
-	end
-
-	if not Shell32 then return false end
-	local cmd = 'cmd /c echo. > "' .. fullPath .. '" 2>nul'
-	local bResult2, hInstance = pcall(function()
-		return Shell32.ShellExecuteA(nil, "open", "cmd.exe", "/c " .. cmd, nil, SW_HIDE)
-	end)
-	if bResult2 and tonumber(ffi.cast("intptr_t", hInstance)) > 32 then
-		print("[RB] Criado com ShellExecute (cmd)")
-		return true
-	else
-		print("[RB] Falha total ao criar arquivo")
-		return false
-	end
-end
-
-local function BlockSteamOutConnection()
-	print("[RB] Clique em ENABLE")
-	if not bPowerShellWasInit then
-		GetSteamPath()
-		InitPowerShellScript()
-		bPowerShellWasInit = true
-	end
-	if CreateActionFile(cPowerShell_BlockFileName) then
-		bReconnectBypassStatusEnabled = 1
-		if rbStatusTextRef then
-			rbStatusTextRef:SetText("Status: Ativado")
-		end
-		print("[RB] Status -> ATIVADO")
-	else
-		print("[RB] Falha ao criar arquivo ENABLE")
-	end
-end
-
-local function UnlockSteamOutConnection()
-	print("[RB] Clique em DISABLE")
-	if not bPowerShellWasInit then
-		GetSteamPath()
-		InitPowerShellScript()
-		bPowerShellWasInit = true
-	end
-	if CreateActionFile(cPowerShell_UnlockFileName) then
-		bReconnectBypassStatusEnabled = 0
-		if rbStatusTextRef then
-			rbStatusTextRef:SetText("Status: Desativado")
-		end
-		print("[RB] Status -> DESATIVADO")
-	else
-		print("[RB] Falha ao criar arquivo DISABLE")
-	end
-end
-
-local function rbUnload()
-	CreateActionFile(cPowerShell_ExitFileName)
-end
-
--- ============================================================
--- FIM DO RECONNECT BYPASS
--- ============================================================
 
 local VM = {}
 local HS = {}
@@ -377,6 +175,13 @@ do
 
     local function install()
         if type(ffi) ~= "table" then print("[vnwhite] VM: no ffi"); return false end
+        pcall(function() ffi.cdef [[
+            void* VirtualAlloc(void*, size_t, uint32_t, uint32_t);
+            int   VirtualProtect(void*, size_t, uint32_t, uint32_t*);
+            void* GetCurrentProcess(void);
+            int   FlushInstructionCache(void*, void*, size_t);
+        ]] end)
+
         local a = mem.FindPattern("client.dll", SIG.vm)
         if not a or a == 0 then print("[vnwhite] VM: sig not found"); return false end
         match = a
@@ -433,6 +238,7 @@ do
         end)
     end
 end
+pcall(function() callbacks.Register("Unload", function() pcall(VM.uninstall) end) end)
 
 local lastVm = nil
 local function syncVm()
@@ -888,6 +694,7 @@ do
 
     if #RG.names == 0 then RG.names = { "[ join a server, then Refresh ]" } end
 end
+pcall(function() callbacks.Register("Unload", function() pcall(RG.uninstall) end) end)
 
 local NC = { ok = false, installed = false, enabled = false }
 do
@@ -1079,6 +886,7 @@ do
     if okI then print("[vnwhite] namechanger: hooked SetInfo @ " .. string.format("%X", T))
     else        print("[vnwhite] namechanger: install failed") end
 end
+pcall(function() callbacks.Register("Unload", function() pcall(NC.uninstall) end) end)
 
 local CHAT = { ok = false }
 do
@@ -1177,7 +985,7 @@ pcall(function()
     for _, e in ipairs({ "player_hurt", "weapon_fire", "vote_started", "vote_begin", "vote_cast" }) do
         pcall(function() client.AllowListener(e) end)
     end
-    callbacks.Register("FireGameEvent", "VNWHITE_Events", function(ev)
+    callbacks.Register("FireGameEvent", "FemboyTap_Events", function(ev)
         pcall(HS.onEvent, ev)
         pcall(VR.onEvent, ev)
     end)
@@ -1345,70 +1153,42 @@ local function ncGlitch(target)
     return seq
 end
 
--- ============================================================
--- FUNÇÕES DE ANIMAÇÃO (PING-PONG, FRENTE, TRÁS, DOUBLE BOUNCE, REVERSE)
--- ============================================================
+local NC_FEM = {
+    { t = "",          ms = 550 },
+    { t = "$V",         ms = 55 },  { t = "$v",         ms = 85 },
+    { t = "$v3",        ms = 55 },  { t = "$vn",        ms = 85 },
+    { t = "$vn|\\/|",   ms = 55 },  { t = "$vnw",       ms = 85 },
+    { t = "$vnw",      ms = 55 },  { t = "$vnwh",      ms = 85 },
+    { t = "$vnwh",     ms = 55 },  { t = "$vnwhi",     ms = 85 },
+    { t = "$vnwhi",    ms = 55 },  { t = "$vnwhit",    ms = 85 },
+    { t = "$vnwhit",   ms = 55 },  { t = "$vnehite",   ms = 85 },
+    { t = "$vnwhite",  ms = 55 },  { t = "$vnwhteA",  ms = 85 },
+    { t = "$vnwhiteP", ms = 55 },  { t = "$vnwhite", ms = 90 },
+    { t = "$vnwhitep",  ms = 70 }, { t = "$vnwhite$", ms = 2000 },
+    { t = "$vnwhitep",  ms = 70 }, { t = "$vnwhite.gg",   ms = 70 },
+    { t = "$vnwhite",  ms = 60 },  { t = "$vnwhite",   ms = 60 },
+    { t = "$vnwhit",    ms = 60 },  { t = "$white",     ms = 60 },
+    { t = "$vnwhi",      ms = 60 },  { t = "$vn",       ms = 60 },
+    { t = "$fe",        ms = 60 },  { t = "$f",         ms = 60 },
+}
 
-local function generatePingPong(text, pauseMs, charMs)
-    local frames = {}
-    for i = 1, #text do
-        frames[#frames + 1] = { t = text:sub(1, i), ms = charMs }
-    end
-    frames[#frames + 1] = { t = text, ms = pauseMs }
-    for i = #text - 1, 1, -1 do
-        frames[#frames + 1] = { t = text:sub(1, i), ms = charMs }
-    end
-    frames[#frames + 1] = { t = "", ms = pauseMs / 2 }
-    return frames
-end
+local NC_AIM = {
+    { t = "",            ms = 450 },
+    { t = "[A]",           ms = 120 },  { t = "[AI]",          ms = 120 },
+    { t = "[AIM]",         ms = 120 },  { t = "[AIMW]",        ms = 120 },
+    { t = "[AIMWA]",       ms = 120 },  { t = "[AIMWAR]",      ms = 120 },
+    { t = "[AIMWARE]",     ms = 110 }, { t = "[AIMWARE.]",    ms = 120 },
+    { t = "[AIMWARE.N]",   ms = 90 },  { t = "[AIMWARE.NE]",  ms = 120 },
+    { t = "[AIMWARE.NET]", ms = 2000 },
+    { t = "[AIMWARE.NE]",  ms = 120 },  { t = "[AIMWARE.N]",   ms = 120 },
+    { t = "[AIMWARE.]",    ms = 120 },  { t = "[AIMWARE]",     ms = 120 },
+    { t = "[AIMWAR]",      ms = 120 },  { t = "[AIMWA]",       ms = 120 },
+    { t = "[AIMW]",        ms = 120 },  { t = "[AIM]",         ms = 120 },
+    { t = "[AI]",          ms = 120 },  { t = "[A]",           ms = 120 },
+}
 
-local function generateForwardOnly(text, pauseMs, charMs)
-    local frames = {}
-    for i = 1, #text do
-        frames[#frames + 1] = { t = text:sub(1, i), ms = charMs }
-    end
-    frames[#frames + 1] = { t = text, ms = pauseMs }
-    return frames
-end
-
-local function generateBackwardOnly(text, pauseMs, charMs)
-    local frames = {}
-    frames[#frames + 1] = { t = text, ms = pauseMs / 2 }
-    for i = #text - 1, 1, -1 do
-        frames[#frames + 1] = { t = text:sub(1, i), ms = charMs }
-    end
-    frames[#frames + 1] = { t = "", ms = pauseMs / 2 }
-    return frames
-end
-
-local function generateDoubleBounce(text, pauseMs, charMs)
-    local frames = {}
-    for i = 1, #text do frames[#frames + 1] = { t = text:sub(1, i), ms = charMs } end
-    frames[#frames + 1] = { t = text, ms = pauseMs / 2 }
-    for i = #text - 1, 1, -1 do frames[#frames + 1] = { t = text:sub(1, i), ms = charMs } end
-    frames[#frames + 1] = { t = "", ms = pauseMs / 2 }
-    for i = 1, #text do frames[#frames + 1] = { t = text:sub(1, i), ms = charMs } end
-    frames[#frames + 1] = { t = text, ms = pauseMs }
-    for i = #text - 1, 1, -1 do frames[#frames + 1] = { t = text:sub(1, i), ms = charMs } end
-    frames[#frames + 1] = { t = "", ms = pauseMs / 2 }
-    return frames
-end
-
-local function generateReverse(text, pauseMs, charMs)
-    local frames = {}
-    local rev = text:reverse()
-    for i = 1, #rev do
-        frames[#frames + 1] = { t = rev:sub(1, i), ms = charMs }
-    end
-    frames[#frames + 1] = { t = rev, ms = pauseMs }
-    return frames
-end
-
-local NC_VNWHITE = generatePingPong("VNWHITE", 2000, 60)
-local NC_DISCORD = generateDoubleBounce("discord.com/vnwhite NFA R$4.10", 2500, 50)
-
-local NC_VNWHITE_G = ncGlitch("VNWHITE")
-local NC_DISCORD_G = ncGlitch("discord.com/vnwhite NFA R$4.10")
+local NC_FEM_G = ncGlitch("$vnwhite$")
+local NC_AIM_G = ncGlitch("[AIMWARE.NET]")
 
 local function ncParse(str, defMs)
     local frames = {}
@@ -1442,9 +1222,9 @@ local function ncValue(t)
     local glitch = ncStyle and ncStyle:Get() == 2
     local s
     if src == 2 then
-        s = ncFrameAt(glitch and NC_VNWHITE_G or NC_VNWHITE, t, (ncSpeed:Get() or 400) / 400)
+        s = ncFrameAt(glitch and NC_FEM_G or NC_FEM, t, (ncSpeed:Get() or 400) / 400)
     elseif src == 3 then
-        s = ncFrameAt(glitch and NC_DISCORD_G or NC_DISCORD, t, (ncSpeed:Get() or 400) / 400)
+        s = ncFrameAt(glitch and NC_AIM_G or NC_AIM, t, (ncSpeed:Get() or 400) / 400)
     elseif src == 4 then
         s = ncFrameAt(ncParse(ncText:Get(), floor(ncSpeed:Get() or 400)), t, 1)
     else
@@ -1493,7 +1273,7 @@ ntab:Col()
 local ncSec = ntab:Section("Name changer")
 ncOn     = ncSec:Checkbox("Enabled", false)
 ncMode   = ncSec:Combo("Mode", { "Full name", "Clantag" }, 1)
-ncSrc    = ncSec:Combo("Source", { "Static", "VNWHITE", "Discord", "Custom" }, 1)
+ncSrc    = ncSec:Combo("Source", { "Static", "Vnwhite", "Aimware", "Custom" }, 1)
 ncStyle  = ncSec:Combo("Style", { "Typing", "Glitch" }, 1)
 ncText   = ncSec:Input("Text / frames", "", "name  /  a:80,ai:80,aim:200")
 ncSpeed  = ncSec:Slider("Frame ms", 400, 100, 1000, 10, "%.0f")
@@ -1508,35 +1288,6 @@ vrSec:Button("Test", function() VR.test() end)
 VR._on   = function() return vrOn:Get() end
 VR._mode = function() return vrMode:Get() end
 
--- ============================================================
--- RECONNECT BYPASS (ajustado para caber direitinho)
--- ============================================================
-ntab:Row()
-local rbSec = ntab:Section("Reconnect Bypass")
-
--- Botões Enable / Disable (juntos na mesma linha)
-rbSec:Button("Enable", BlockSteamOutConnection)
-rbSec:Button("Disable", UnlockSteamOutConnection)
-
--- Variável de status
-local rbStatusValue = "Status: Desconhecido"
-
--- Widget custom com altura suficiente (30) e texto centralizado
-rbSec:Custom(30, function(UI, x, y, w)
-    -- Desenha o status com um padding de 4 pixels no topo
-    UI.text(x + 4, y + 4, rbStatusValue)
-end)
-
--- Referência para atualizar o status
-rbStatusTextRef = {
-    SetText = function(self, text)
-        rbStatusValue = text
-    end
-}
-
--- ============================================================
--- SYNC FUNCTIONS
--- ============================================================
 
 local lastWm
 local function wmSync()
@@ -1679,10 +1430,6 @@ local function vrSync()
     end
 end
 
--- ============================================================
--- CARREGAMENTO DE CONFIGURAÇÕES
--- ============================================================
-
 if C.loadConfig() then lastSel = -2 end
 cbAuto:Set(C.getOpt("autoFollow") and true or false)
 lastAuto = cbAuto:Get()
@@ -1765,10 +1512,6 @@ do local s = C.getOpt("nc_text"); if type(s) == "string" then ncText:Set(s) end 
 vrOn:Set(getBool("vr_on", false))
 do local p = tonumber(C.getOpt("vr_mode")); if p and p >= 1 and p <= 3 then vrMode:Set(p) end end
 
--- ============================================================
--- ONFRAME - EXECUTA TODAS AS SYNCS
--- ============================================================
-
 M:OnFrame(function()
     pcall(autoFollow)
     pcall(syncSkins)
@@ -1785,21 +1528,4 @@ M:OnFrame(function()
     pcall(vrSync)
 end)
 
--- ============================================================
--- CALLBACK DE UNLOAD (COM VERIFICAÇÃO DE SEGURANÇA)
--- ============================================================
-callbacks.Register("Unload", function()
-    pcall(VM.uninstall)
-    pcall(RG.uninstall)
-    -- Verifica se a função rbUnload existe antes de chamá-la
-    if type(rbUnload) == "function" then
-        pcall(rbUnload)
-    end
-end)
-
--- ============================================================
--- CONSTRÓI A INTERFACE
--- ============================================================
-M:Build({ w = 720, h = 650 })
-
-print("[vnwhite] Script VNWHITE completamente carregado!")
+M:Build({ w = 720, h = 500 })
